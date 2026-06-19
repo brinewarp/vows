@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- user-scalable=no lets us handle zoom ourselves via JS -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>For Alexandra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body.dragging { cursor: grabbing; }
+
+    /* ── Galaxy background ── */
+    #bg-image {
+      position: fixed;
+      inset: 0;
+      background: url('galaxy.png') center center / cover no-repeat;
+      z-index: 0;
+    }
+    #bg-image::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 12, 0.42);
+    }
+
+    /* ── Animated twinkling stars ── */
+    #twinkle {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── Pannable / zoomable world ── */
+    #world {
+      position: fixed;
+      top: 0; left: 0;
+      width: 8000px;
+      height: 5000px;
+      z-index: 10;
+      will-change: transform;
+      transform-origin: 0 0;
+    }
+
+    /* ── Vow content floats in center of world ── */
+    .vow-content {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 860px;
+      text-align: center;
+      background: radial-gradient(ellipse 115% 130% at 50% 50%,
+        rgba(0, 0, 18, 0.72) 0%,
+        rgba(0, 0, 18, 0.46) 55%,
+        transparent 100%);
+      padding: 90px 88px 100px;
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+
+    /* ── Title ── */
+    .title {
+      font-family: 'Pinyon Script', cursive;
+      font-size: 7.5rem;
+      color: #daccff;
+      line-height: 1.05;
+      margin-bottom: 6px;
+      text-shadow:
+        0 0 22px rgba(190,120,255,0.75),
+        0 0 60px rgba(140,70,245,0.5),
+        0 0 130px rgba(90,25,185,0.3);
+      animation: floatTitle 7s ease-in-out infinite;
+    }
+    @keyframes floatTitle {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-8px); }
+    }
+
+    .subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.72rem;
+      letter-spacing: 9px;
+      text-transform: uppercase;
+      color: rgba(185,155,240,0.52);
+      margin-bottom: 52px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 0 auto 48px;
+      width: 72%;
+    }
+    .div-line {
+      flex: 1; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(160,110,250,0.45), transparent);
+    }
+    .div-star { position: relative; width: 10px; height: 10px; }
+    .div-star::before, .div-star::after {
+      content: ''; position: absolute; background: rgba(195,155,255,0.65);
+    }
+    .div-star::before { width: 1px; height: 10px; left: 50%; top: 0; }
+    .div-star::after  { width: 10px; height: 1px; top: 50%; left: 0; }
+    .div-gem {
+      width: 5px; height: 5px;
+      background: rgba(175,125,255,0.62);
+      transform: rotate(45deg);
+    }
+
+    /* ── Vow text ── */
+    .vow-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.45rem;
+      font-weight: 300;
+      font-style: italic;
+      line-height: 2.3;
+      color: rgba(235,225,255,0.93);
+      text-align: justify;
+      hyphens: auto;
+      text-shadow: 0 1px 12px rgba(0,0,20,0.7);
+    }
+    .vow-text p + p { margin-top: 2.4rem; }
+
+    .name-drop {
+      font-family: 'Pinyon Script', cursive;
+      font-size: 2.4rem;
+      font-style: normal;
+      color: #cfaeff;
+      text-shadow:
+        0 0 15px rgba(175,95,255,0.6),
+        0 0 38px rgba(125,55,225,0.35);
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 0.8;
+      margin-right: 1px;
+    }
+
+    /* ── Closing ── */
+    .closing { margin-top: 50px; }
+    .closing-line {
+      font-family: 'Pinyon Script', cursive;
+      font-size: 3rem;
+      color: rgba(205,168,255,0.68);
+      text-shadow: 0 0 20px rgba(145,75,235,0.38);
+    }
+
+    /* ── Zoom controls ── */
+    #zoom-controls {
+      position: fixed;
+      bottom: 28px; left: 28px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .zoom-btn {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: rgba(6,3,26,0.78);
+      border: 1px solid rgba(135,85,225,0.38);
+      backdrop-filter: blur(14px);
+      color: rgba(215,180,255,0.88);
+      font-size: 1.3rem;
+      line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: box-shadow 0.3s, background 0.3s;
+      font-family: sans-serif;
+    }
+    .zoom-btn:hover {
+      background: rgba(38,14,88,0.88);
+      box-shadow: 0 0 18px rgba(135,75,235,0.5);
+    }
+
+    /* ── Audio button ── */
+    #audio-btn {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      z-index: 100;
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: rgba(6,3,26,0.78);
+      border: 1px solid rgba(135,85,225,0.38);
+      backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: box-shadow 0.3s, background 0.3s;
+    }
+    #audio-btn:hover {
+      background: rgba(38,14,88,0.88);
+      box-shadow: 0 0 22px rgba(135,75,235,0.52);
+    }
+    #audio-btn svg {
+      width: 20px; height: 20px;
+      fill: rgba(215,180,255,0.88);
+      pointer-events: none;
+    }
+
+    /* ── Hint ── */
+    #hint {
+      position: fixed;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.72rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(165,135,215,0.42);
+      z-index: 100;
+      pointer-events: none;
+      white-space: nowrap;
+      opacity: 0;
+      animation: hintFade 5s ease forwards 2.5s;
+    }
+    @keyframes hintFade {
+      0%  { opacity:0; } 20% { opacity:1; } 80% { opacity:1; } 100% { opacity:0; }
+    }
+
+    /* ══════════════════════════════════════════
+       MOBILE  (≤ 600px)
+       The world starts zoomed out; content width
+       is narrower and paddings are tighter.
+    ══════════════════════════════════════════ */
+    @media (max-width: 600px) {
+      .vow-content {
+        width: 620px;
+        padding: 60px 44px 70px;
+      }
+      .title      { font-size: 5.5rem; }
+      .vow-text   { font-size: 1.25rem; line-height: 2.1; text-align: left; }
+      .name-drop  { font-size: 2rem; }
+      .closing-line { font-size: 2.4rem; }
+      .subtitle   { font-size: 0.6rem; letter-spacing: 6px; margin-bottom: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="bg-image"></div>
+<canvas id="twinkle"></canvas>
+
+<audio id="bg-audio" loop preload="auto">
+  <source src="Radiohead - Present Tense (Original Mix).mp3" type="audio/mpeg">
+</audio>
+
+<div id="world">
+  <div class="vow-content">
+
+    <div class="title">For Alexandra</div>
+    <div class="subtitle">Wedding Vows</div>
+
+    <div class="divider">
+      <div class="div-line"></div>
+      <div class="div-gem"></div>
+      <div class="div-star"></div>
+      <div class="div-gem"></div>
+      <div class="div-line"></div>
+    </div>
+
+    <div class="vow-text">
+      <p>There were so many days, months, and years where I wondered if I would ever, finally, find the "one". How would I find someone who likes Radiohead? Someone who enjoys spending hours hunting down vintage records, CDs, and cassettes at dingy old stores in New York City? Who can deal with a UFO fanatic's non-stop search for proof that aliens exist? Who can handle some Jersey 'tude and can return it in equal measure? Someone who is always up for an adventure whether it be in Encinitas or a derelict factory in Berlin? And someone who is willing to get a little weird at that factory in Berlin? But most importantly… how would I find someone who checks off ALL of those boxes AND is loved by my friends and family?</p>
+
+      <p><span class="name-drop">Alexandra Brown</span>… I love you for being you. You checked off every single one of those boxes. One of my greatest pleasures is watching you interact with our friends and family. There is a special "something" that you have which very few people do. An ability to connect with people. Not just a surface level connection though. A true, deep, meaningful connection. And your "energy". You have an energy that is efficacious. It affects everyone around you. Without you, every get together, every party, every trip, every day would not be as vibrant. And without you, I would not be complete. You're my gal. I've never doubted it. Never. Our love for each other. Our foundation. Will never crack or falter for the rest of our lives. And the family we create together will be built upon the strength of that foundation, blossoming into the family we always dreamed of having. I cannot wait. Love you forever.</p>
+    </div>
+
+    <div class="closing">
+      <div class="divider" style="margin-top:50px;margin-bottom:34px;">
+        <div class="div-line"></div>
+        <div class="div-gem"></div>
+        <div class="div-star"></div>
+        <div class="div-gem"></div>
+        <div class="div-line"></div>
+      </div>
+      <div class="closing-line">With all of my love, forever</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Zoom controls -->
+<div id="zoom-controls">
+  <button class="zoom-btn" id="zoom-in"  aria-label="Zoom in">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out">−</button>
+</div>
+
+<button id="audio-btn" aria-label="Toggle music">
+  <svg id="icon-on" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+  <svg id="icon-off" viewBox="0 0 24 24" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+</button>
+
+<div id="hint">drag · scroll to zoom · pinch on mobile</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  TWINKLING STARS
+// ══════════════════════════════════════════════════════
+const tc   = document.getElementById('twinkle');
+const tctx = tc.getContext('2d');
+function resizeTwinkle() { tc.width = window.innerWidth; tc.height = window.innerHeight; }
+resizeTwinkle();
+window.addEventListener('resize', resizeTwinkle);
+
+const TWINKLERS = Array.from({ length: 70 }, () => ({
+  x: Math.random(), y: Math.random(),
+  r: 0.4 + Math.random() * 1.8,
+  phase: Math.random() * Math.PI * 2,
+  speed: 0.006 + Math.random() * 0.022,
+  color: Math.random() > 0.5 ? '#ffffff' : '#b8e4ff',
+}));
+const WISPS = Array.from({ length: 7 }, () => ({
+  x: Math.random(), y: Math.random(),
+  rx: 90 + Math.random()*160, ry: 45 + Math.random()*80,
+  vx: (Math.random()-.5)*0.00007, vy: (Math.random()-.5)*0.00005,
+  color: ['#0a50a0','#5010a0','#0060a0','#4008a0'][Math.floor(Math.random()*4)],
+  phase: Math.random()*Math.PI*2,
+}));
+
+function animTwinkle() {
+  const W = tc.width, H = tc.height;
+  tctx.clearRect(0, 0, W, H);
+  TWINKLERS.forEach(s => {
+    s.phase += s.speed;
+    tctx.globalAlpha = 0.15 + 0.85*(0.5+0.5*Math.sin(s.phase));
+    tctx.fillStyle = s.color;
+    tctx.beginPath();
+    tctx.arc(s.x*W, s.y*H, s.r, 0, Math.PI*2);
+    tctx.fill();
+  });
+  WISPS.forEach(w => {
+    w.x = ((w.x+w.vx+1)%1); w.y = ((w.y+w.vy+1)%1); w.phase += 0.003;
+    tctx.save();
+    tctx.filter = 'blur(28px)';
+    tctx.globalAlpha = 0.03+0.025*Math.sin(w.phase);
+    tctx.fillStyle = w.color;
+    tctx.beginPath();
+    tctx.ellipse(w.x*W, w.y*H, w.rx, w.ry, 0, 0, Math.PI*2);
+    tctx.fill();
+    tctx.restore();
+  });
+  tctx.globalAlpha = 1;
+  requestAnimationFrame(animTwinkle);
+}
+requestAnimationFrame(animTwinkle);
+
+// ══════════════════════════════════════════════════════
+//  PAN + ZOOM
+// ══════════════════════════════════════════════════════
+const world  = document.getElementById('world');
+const WORLD_W = 8000, WORLD_H = 5000;
+
+// Initial scale: on mobile, fit the content (620px wide) into the viewport
+const isMobile = window.innerWidth <= 600;
+let scale  = isMobile ? Math.min(0.9, window.innerWidth / 660) : 1.0;
+const MIN_SCALE = 0.2, MAX_SCALE = 3.0;
+
+// Start centered on the content
+let panX = -(WORLD_W/2 - window.innerWidth/2);
+let panY = -(WORLD_H/2 - window.innerHeight/2);
+
+let isDragging = false;
+let dragSX = 0, dragSY = 0, panSX = 0, panSY = 0;
+let velX = 0, velY = 0, lastMX = 0, lastMY = 0, lastMT = 0;
+
+function applyTransform() {
+  // transform-origin is 0,0; we translate then scale
+  world.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
+}
+applyTransform();
+
+// ── Zoom towards a screen point (cx, cy) ──────────────
+function zoomAt(cx, cy, factor) {
+  const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+  if (newScale === scale) return;
+  // Keep world point under (cx,cy) fixed
+  panX = cx - (cx - panX) * (newScale / scale);
+  panY = cy - (cy - panY) * (newScale / scale);
+  scale = newScale;
+  applyTransform();
+}
+
+// ── Scroll wheel zoom ──────────────────────────────────
+document.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 1/1.1;
+  zoomAt(e.clientX, e.clientY, factor);
+}, { passive: false });
+
+// ── Zoom buttons ───────────────────────────────────────
+document.getElementById('zoom-in').addEventListener('click', e => {
+  e.stopPropagation();
+  zoomAt(window.innerWidth/2, window.innerHeight/2, 1.2);
+});
+document.getElementById('zoom-out').addEventListener('click', e => {
+  e.stopPropagation();
+  zoomAt(window.innerWidth/2, window.innerHeight/2, 1/1.2);
+});
+
+// ── Mouse drag ─────────────────────────────────────────
+document.addEventListener('mousedown', e => {
+  if (e.target.closest('#audio-btn') || e.target.closest('#zoom-controls')) return;
+  isDragging = true; velX = velY = 0;
+  dragSX = e.clientX; dragSY = e.clientY;
+  panSX = panX; panSY = panY;
+  lastMX = e.clientX; lastMY = e.clientY; lastMT = performance.now();
+  document.body.classList.add('dragging');
+});
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const now = performance.now(), dt = now-lastMT||1;
+  velX = (e.clientX-lastMX)/dt*16; velY = (e.clientY-lastMY)/dt*16;
+  lastMX = e.clientX; lastMY = e.clientY; lastMT = now;
+  panX = panSX+(e.clientX-dragSX);
+  panY = panSY+(e.clientY-dragSY);
+  applyTransform();
+});
+document.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false;
+  document.body.classList.remove('dragging');
+  inertia();
+});
+
+// ── Touch: 1-finger drag + 2-finger pinch zoom ─────────
+let lastPinchDist = 0;
+
+document.addEventListener('touchstart', e => {
+  if (e.target.closest('#audio-btn') || e.target.closest('#zoom-controls')) return;
+  if (e.touches.length === 1) {
+    isDragging = true; velX = velY = 0;
+    const t = e.touches[0];
+    dragSX = t.clientX; dragSY = t.clientY;
+    panSX = panX; panSY = panY;
+    lastMX = t.clientX; lastMY = t.clientY; lastMT = performance.now();
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastPinchDist = Math.hypot(dx, dy);
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isDragging) {
+    const t = e.touches[0];
+    const now = performance.now(), dt = now-lastMT||1;
+    velX = (t.clientX-lastMX)/dt*16; velY = (t.clientY-lastMY)/dt*16;
+    lastMX = t.clientX; lastMY = t.clientY; lastMT = now;
+    panX = panSX+(t.clientX-dragSX);
+    panY = panSY+(t.clientY-dragSY);
+    applyTransform();
+  } else if (e.touches.length === 2) {
+    const dx   = e.touches[0].clientX - e.touches[1].clientX;
+    const dy   = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    if (lastPinchDist > 0) zoomAt(midX, midY, dist / lastPinchDist);
+    lastPinchDist = dist;
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  if (e.touches.length === 0) {
+    isDragging = false;
+    lastPinchDist = 0;
+    inertia();
+  } else if (e.touches.length === 1) {
+    // Dropped from 2 fingers to 1 — restart drag from current position
+    lastPinchDist = 0;
+    isDragging = true;
+    const t = e.touches[0];
+    dragSX = t.clientX; dragSY = t.clientY;
+    panSX = panX; panSY = panY;
+    lastMX = t.clientX; lastMY = t.clientY; lastMT = performance.now();
+  }
+});
+
+function inertia() {
+  if (Math.abs(velX) < 0.1 && Math.abs(velY) < 0.1) return;
+  (function step() {
+    if (isDragging) return;
+    velX *= 0.92; velY *= 0.92;
+    panX += velX; panY += velY;
+    applyTransform();
+    if (Math.abs(velX) > 0.05 || Math.abs(velY) > 0.05) requestAnimationFrame(step);
+  })();
+}
+
+// ══════════════════════════════════════════════════════
+//  AUDIO
+// ══════════════════════════════════════════════════════
+const audio = document.getElementById('bg-audio');
+const btn   = document.getElementById('audio-btn');
+const iOn   = document.getElementById('icon-on');
+const iOff  = document.getElementById('icon-off');
+let playing = false;
+
+function fadeIn() {
+  audio.volume = 0;
+  const iv = setInterval(() => {
+    audio.volume = Math.min(0.5, audio.volume+0.008);
+    if (audio.volume >= 0.5) clearInterval(iv);
+  }, 150);
+}
+function tryPlay() {
+  audio.play().then(() => { playing=true; iOn.style.display=''; iOff.style.display='none'; fadeIn(); }).catch(()=>{});
+}
+tryPlay();
+document.addEventListener('mousedown', () => { if (!playing) tryPlay(); }, { once:true });
+document.addEventListener('touchstart', () => { if (!playing) tryPlay(); }, { once:true });
+
+btn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (audio.paused) {
+    audio.play().then(() => { playing=true; fadeIn(); iOn.style.display=''; iOff.style.display='none'; });
+  } else {
+    audio.pause(); playing=false; iOn.style.display='none'; iOff.style.display='';
+  }
+});
+</script>
+</body>
+</html>
