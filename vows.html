@@ -129,7 +129,7 @@
       font-weight: 300;
       font-style: italic;
       line-height: 2.3;
-      color: #FFFFFF;
+      color: rgba(235,225,255,0.93);
       text-align: justify;
       hyphens: auto;
       text-shadow: 0 1px 12px rgba(0,0,20,0.7);
@@ -238,14 +238,15 @@
     ══════════════════════════════════════════ */
     @media (max-width: 600px) {
       .vow-content {
-        width: 620px;
-        padding: 60px 44px 70px;
+        width: 560px;
+        padding: 52px 38px 64px;
       }
-      .title      { font-size: 5.5rem; }
-      .vow-text   { font-size: 1.25rem; line-height: 2.1; text-align: left; }
-      .name-drop  { font-size: 2rem; }
-      .closing-line { font-size: 2.4rem; }
-      .subtitle   { font-size: 0.6rem; letter-spacing: 6px; margin-bottom: 36px; }
+      .title        { font-size: 4.8rem; }
+      .subtitle     { font-size: 0.58rem; letter-spacing: 5px; margin-bottom: 32px; }
+      .vow-text     { font-size: 1.18rem; line-height: 2.05; text-align: left; }
+      .name-drop    { font-size: 1.85rem; }
+      .closing-line { font-size: 2.2rem; }
+      .divider      { width: 85%; }
     }
   </style>
 </head>
@@ -365,12 +366,14 @@ const WORLD_W = 8000, WORLD_H = 5000;
 
 // Initial scale: on mobile, fit the content (620px wide) into the viewport
 const isMobile = window.innerWidth <= 600;
-let scale  = isMobile ? Math.min(0.9, window.innerWidth / 660) : 1.0;
-const MIN_SCALE = 0.2, MAX_SCALE = 3.0;
+let scale  = isMobile ? Math.min(0.85, window.innerWidth / 680) : 1.0;
+const MIN_SCALE = 0.15, MAX_SCALE = 3.0;
 
-// Start centered on the content
-let panX = -(WORLD_W/2 - window.innerWidth/2);
-let panY = -(WORLD_H/2 - window.innerHeight/2);
+// Start centered on the content — pan must account for scale
+// With transform: translate(panX,panY) scale(scale) and origin 0,0:
+// screen = panX + worldX * scale  →  center world point at screen center
+let panX = window.innerWidth  / 2 - (WORLD_W / 2) * scale;
+let panY = window.innerHeight / 2 - (WORLD_H / 2) * scale;
 
 let isDragging = false;
 let dragSX = 0, dragSY = 0, panSX = 0, panSY = 0;
